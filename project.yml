@@ -1,0 +1,55 @@
+name: MountPilot
+options:
+  bundleIdPrefix: com.bettinelli
+  deploymentTarget:
+    macOS: "13.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  MountPilot:
+    type: application
+    platform: macOS
+    sources:
+      - path: MountPilot
+    info:
+      path: MountPilot/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: MountPilot
+        CFBundleName: MountPilot
+        CFBundleShortVersionString: "1.1"
+        CFBundleVersion: "2"
+        LSMinimumSystemVersion: "13.0"
+        LSUIElement: true
+        NSHumanReadableCopyright: "Copyright © 2026"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bettinelli.MountPilot
+        PRODUCT_NAME: MountPilot
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: false
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: false
+  MountPilotTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MountPilotTests
+    dependencies:
+      - target: MountPilot
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bettinelli.MountPilotTests
+        GENERATE_INFOPLIST_FILE: true
+schemes:
+  MountPilot:
+    build:
+      targets:
+        MountPilot: all
+        MountPilotTests: [test]
+    test:
+      targets:
+        - MountPilotTests
