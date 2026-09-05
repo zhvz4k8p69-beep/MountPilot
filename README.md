@@ -34,6 +34,10 @@ already running.
 5. Add each clone drive's exact Finder volume name, such as `Clone Backup`.
 6. Enable **Launch at login** and click **Save**.
 
+The current community build is locally signed but not notarized. If macOS says
+it cannot verify the developer, Control-click MountPilot in `/Applications`,
+choose **Open**, and confirm **Open** once. Subsequent launches work normally.
+
 When macOS first connects to a share, use Finder's normal credential prompt and
 save the password in Keychain.
 
