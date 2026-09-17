@@ -16,6 +16,20 @@ final class AppConfigurationTests: XCTestCase {
         XCTAssertFalse(AppConfiguration.validShare("smb:///missing-host"))
     }
 
+    func testShareURLEncodesSpacesAndKeepsExistingEncoding() {
+        XCTAssertEqual(
+            AppConfiguration.shareURL(for: "smb://DS420/Mac Studio Time Machine")?.absoluteString,
+            "smb://DS420/Mac%20Studio%20Time%20Machine"
+        )
+        XCTAssertEqual(
+            AppConfiguration.shareURL(for: "smb://user@nas.local/Time%20Machine")?.absoluteString,
+            "smb://user@nas.local/Time%20Machine"
+        )
+        XCTAssertEqual(AppConfiguration.shareURL(for: "afp://nas/Share")?.host, "nas")
+        XCTAssertNil(AppConfiguration.shareURL(for: "ftp://nas/Share"))
+        XCTAssertNil(AppConfiguration.shareURL(for: "   "))
+    }
+
     func testVolumeNamesResolveOnlyBelowVolumes() {
         XCTAssertEqual(AppConfiguration.volumePath(for: "Clone Backup"), "/Volumes/Clone Backup")
         XCTAssertEqual(AppConfiguration.volumePath(for: "/Volumes/Clone Backup"), "/Volumes/Clone Backup")

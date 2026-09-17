@@ -15,7 +15,7 @@ struct SettingsView: View {
                 header
                 inputSection(
                     title: "Network shares",
-                    help: "One smb://, afp://, or nfs:// address per line. Save credentials in Finder/Keychain when macOS asks.",
+                    help: "One smb://, afp://, or nfs:// address per line. Shares connect in the background with the password saved in Keychain; if none is saved yet, Finder asks once.",
                     text: $sharesText,
                     prompt: "smb://server/share"
                 )

@@ -10,7 +10,8 @@ already running.
 
 ## Features
 
-- Connects configured SMB, AFP, and NFS shares after login
+- Connects configured SMB, AFP, and NFS shares silently after login, using
+  passwords already saved in Keychain
 - Automatically detects active Time Machine backups
 - Uses Carbon Copy Cloner's official task-status command when CCC is installed
 - Supports configurable process-name guards for other backup applications
@@ -26,7 +27,7 @@ already running.
 
 ## Install
 
-1. Download `MountPilot-1.1.zip` from the
+1. Download `MountPilot-1.2.zip` from the
    [latest release](https://github.com/zhvz4k8p69-beep/MountPilot/releases/latest).
 2. Unzip it and move **MountPilot.app** to `/Applications`.
 3. Open MountPilot. Its settings window appears on first launch.
@@ -38,8 +39,11 @@ The current community build is locally signed but not notarized. If macOS says
 it cannot verify the developer, Control-click MountPilot in `/Applications`,
 choose **Open**, and confirm **Open** once. Subsequent launches work normally.
 
-When macOS first connects to a share, use Finder's normal credential prompt and
-save the password in Keychain.
+Shares connect in the background with the password saved in Keychain, so no
+dialog appears at login. The first time a server has no saved password,
+MountPilot opens Finder's normal credential prompt instead; enter the password
+there and tick **Remember this password in my keychain**. Every later
+connection is silent.
 
 ## Safety model
 
@@ -85,8 +89,9 @@ xcodebuild \
 
 MountPilot has no analytics, accounts, advertisements, or network service of its
 own. Its preferences contain share addresses, volume names, startup delay, and
-optional process-name guards. Passwords remain under macOS Keychain/Finder
-control.
+optional process-name guards. Passwords remain under macOS Keychain control;
+MountPilot never reads them itself but asks the system's NetFS framework to
+connect with whatever Keychain has saved.
 
 ## License
 

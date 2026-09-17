@@ -19,10 +19,26 @@ struct AppConfiguration: Codable, Equatable {
     }
 
     static func validShare(_ value: String) -> Bool {
-        guard let url = URL(string: value), let scheme = url.scheme?.lowercased() else {
-            return false
+        shareURL(for: value) != nil
+    }
+
+    /// Builds a mountable URL for a share address. Spaces in share names such as
+    /// `smb://nas/Time Machine` are percent-encoded so NetFS accepts them.
+    static func shareURL(for value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.formUnion(.urlHostAllowed)
+        allowed.formUnion(.urlUserAllowed)
+        allowed.insert(charactersIn: ":@%")
+        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: allowed),
+              let url = URL(string: encoded),
+              let scheme = url.scheme?.lowercased(),
+              ["smb", "afp", "nfs"].contains(scheme),
+              let host = url.host, !host.isEmpty else {
+            return nil
         }
-        return ["smb", "afp", "nfs"].contains(scheme) && url.host != nil
+        return url
     }
 
     static func volumePath(for value: String) -> String? {
