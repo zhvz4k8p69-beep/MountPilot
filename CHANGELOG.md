@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3 — 2026-11-23
+
+- Network shares are now rechecked periodically (every 5 minutes by default,
+  adjustable or off in Settings) and remounted if they have dropped.
+- Shares are also rechecked 15 seconds after the Mac wakes from sleep.
+- Background rechecks stay quiet when everything is mounted, report an outage
+  once rather than on every pass, and never open a Finder password dialog.
+- Settings saved by older versions load correctly when new options are added.
+
 ## 1.2 — 2026-09-17
 
 - Network shares now connect silently in the background through the NetFS

@@ -10,6 +10,12 @@ final class AppModel: ObservableObject {
 
     private let store: ConfigurationStore
     private var startupTask: Task<Void, Never>?
+    private var recheckTask: Task<Void, Never>?
+    private var wakeTask: Task<Void, Never>?
+    private var wakeObserver: NSObjectProtocol?
+    /// Shares whose last background recheck failed, with the message logged,
+    /// so an outage is reported once instead of on every pass.
+    private var recheckFailures: [String: String] = [:]
     private var settingsWindowController: NSWindowController?
 
     init(store: ConfigurationStore = ConfigurationStore()) {
@@ -35,6 +41,83 @@ final class AppModel: ObservableObject {
             guard !Task.isCancelled else { return }
             await self?.runNow()
         }
+    }
+
+    /// Starts (or restarts) the background loop that confirms network shares
+    /// are still mounted, and rechecks shortly after the Mac wakes from sleep.
+    func startPeriodicChecks() {
+        recheckTask?.cancel()
+        recheckTask = nil
+        if wakeObserver == nil {
+            wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in self?.scheduleWakeRecheck() }
+            }
+        }
+
+        let minutes = configuration.recheckIntervalMinutes
+        guard minutes > 0, !configuration.networkShares.isEmpty else { return }
+        recheckTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(minutes * 60))
+                guard !Task.isCancelled else { return }
+                await self?.recheckShares()
+            }
+        }
+    }
+
+    private func scheduleWakeRecheck() {
+        guard configuration.recheckIntervalMinutes > 0 else { return }
+        wakeTask?.cancel()
+        // Give Wi-Fi/Ethernet time to come back before reconnecting.
+        wakeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(15))
+            guard !Task.isCancelled else { return }
+            await self?.recheckShares()
+        }
+    }
+
+    /// Remounts any configured share that is no longer mounted. Quiet when
+    /// everything is in place; never touches clone volumes and never opens a
+    /// Finder password dialog.
+    func recheckShares() async {
+        guard !isRunning, startupTask == nil else { return }
+        let shares = configuration.networkShares
+        guard !shares.isEmpty else { return }
+
+        let mounted = await Task.detached { MountService.mountedShareKeys() }.value
+        let missing = shares.filter { share in
+            guard let key = AppConfiguration.shareKey(for: share) else { return true }
+            return !mounted.contains(key)
+        }
+        for share in shares where !missing.contains(share) {
+            if recheckFailures.removeValue(forKey: share) != nil {
+                log(.success, "\(share) is connected again")
+            }
+        }
+        guard !missing.isEmpty else { return }
+
+        isRunning = true
+        for share in missing {
+            let outcome = await Task.detached {
+                MountService.mountShare(share, allowFinderPrompt: false)
+            }.value
+            if outcome.succeeded {
+                recheckFailures.removeValue(forKey: share)
+                // NetFS says "already connected" when the mount table entry
+                // just didn't match the configured address; nothing to report.
+                if !outcome.message.hasPrefix("Already connected") {
+                    log(.success, "Reconnected: \(outcome.message)")
+                }
+            } else if recheckFailures[share] != outcome.message {
+                recheckFailures[share] = outcome.message
+                log(.failure, outcome.message)
+            }
+        }
+        isRunning = false
     }
 
     func cancelStartupRun() {
@@ -99,6 +182,8 @@ final class AppModel: ObservableObject {
             saved.runAtLogin = LoginItemService.isEnabled
             try store.save(saved)
             configuration = saved
+            recheckFailures = [:]
+            startPeriodicChecks()
             log(.success, "Settings saved")
             return nil
         } catch {

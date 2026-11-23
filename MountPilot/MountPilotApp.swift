@@ -14,6 +14,7 @@ struct MountPilotApp: App {
             } else {
                 appModel.scheduleStartupRun()
             }
+            appModel.startPeriodicChecks()
         }
     }
 

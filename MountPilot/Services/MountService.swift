@@ -12,7 +12,7 @@ enum MountService {
     /// Keychain. No dialog is shown. If macOS has no saved credentials for the
     /// server, MountPilot falls back to Finder's normal connection dialog so the
     /// password can be entered once and saved.
-    static func mountShare(_ value: String) -> OperationOutcome {
+    static func mountShare(_ value: String, allowFinderPrompt: Bool = true) -> OperationOutcome {
         guard let url = AppConfiguration.shareURL(for: value) else {
             return OperationOutcome(succeeded: false, message: "Invalid network share: \(value)")
         }
@@ -34,6 +34,13 @@ enum MountService {
 
         guard isCredentialFailure(result.status) else {
             return OperationOutcome(succeeded: false, message: "Could not connect to \(value): \(describe(result.status))")
+        }
+
+        guard allowFinderPrompt else {
+            return OperationOutcome(
+                succeeded: false,
+                message: "Could not reconnect \(value): no saved Keychain password. Use Run Now to enter it."
+            )
         }
 
         // No usable Keychain credentials. Let Finder ask once so the user can
@@ -65,6 +72,34 @@ enum MountService {
         }
         let detail = result.combinedOutput.isEmpty ? "the volume is busy" : result.combinedOutput
         return OperationOutcome(succeeded: false, message: "Left \(path) mounted: \(detail)")
+    }
+
+    /// Reports whether a share is currently in the mount table. Uses getfsstat
+    /// with MNT_NOWAIT so a dead server can never hang the check. Hidden mounts
+    /// (such as Time Machine's private copy under /Volumes/.timemachine) do not
+    /// count, because they disappear when a backup ends.
+    static func isShareMounted(_ value: String) -> Bool {
+        guard let key = AppConfiguration.shareKey(for: value) else { return false }
+        return mountedShareKeys().contains(key)
+    }
+
+    static func mountedShareKeys() -> Set<String> {
+        var entries: UnsafeMutablePointer<statfs>?
+        let count = getmntinfo(&entries, MNT_NOWAIT)
+        guard count > 0, let entries else { return [] }
+
+        var keys = Set<String>()
+        for index in 0..<Int(count) {
+            var entry = entries[index]
+            if entry.f_flags & UInt32(MNT_DONTBROWSE) != 0 { continue }
+            let type = withUnsafeBytes(of: &entry.f_fstypename) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) }
+            guard ["smbfs", "afpfs", "nfs"].contains(type) else { continue }
+            let source = withUnsafeBytes(of: &entry.f_mntfromname) { String(cString: $0.bindMemory(to: CChar.self).baseAddress!) }
+            if let key = AppConfiguration.shareKey(for: source) {
+                keys.insert(key)
+            }
+        }
+        return keys
     }
 
     // MARK: - NetFS

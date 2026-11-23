@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var volumesText = ""
     @State private var processText = ""
     @State private var delay = 20
+    @State private var recheckMinutes = 5
     @State private var runAtLogin = false
     @State private var errorMessage: String?
 
@@ -37,6 +38,19 @@ struct SettingsView: View {
                     Spacer()
                     Toggle("Launch at login", isOn: $runAtLogin)
                         .toggleStyle(.switch)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Stepper(
+                        recheckMinutes == 0
+                            ? "Recheck shares: Off"
+                            : "Recheck shares every \(recheckMinutes) minute\(recheckMinutes == 1 ? "" : "s")",
+                        value: $recheckMinutes,
+                        in: 0...60
+                    )
+                    Text("Reconnects any network share that has dropped, and checks again after the Mac wakes. Clone volumes are only handled at startup.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 if let errorMessage {
@@ -75,7 +89,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("MountPilot")
                 .font(.largeTitle.bold())
-            Text("Connect network shares and safely put clone drives away after login.")
+            Text("Connect network shares, keep them connected, and safely put clone drives away after login.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -130,6 +144,7 @@ struct SettingsView: View {
         volumesText = value.cloneVolumes.joined(separator: "\n")
         processText = value.backupProcessTerms.joined(separator: "\n")
         delay = value.startupDelaySeconds
+        recheckMinutes = value.recheckIntervalMinutes
         runAtLogin = value.runAtLogin
     }
 
@@ -150,7 +165,8 @@ struct SettingsView: View {
             cloneVolumes: volumes,
             backupProcessTerms: AppConfiguration.normalizedLines(processText),
             startupDelaySeconds: delay,
-            runAtLogin: runAtLogin
+            runAtLogin: runAtLogin,
+            recheckIntervalMinutes: recheckMinutes
         )
         errorMessage = model.save(updated)
     }

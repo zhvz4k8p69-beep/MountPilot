@@ -6,8 +6,67 @@ struct AppConfiguration: Codable, Equatable {
     var backupProcessTerms: [String] = []
     var startupDelaySeconds: Int = 20
     var runAtLogin: Bool = false
+    /// How often to confirm network shares are still mounted. 0 turns it off.
+    var recheckIntervalMinutes: Int = 5
 
     static let `default` = AppConfiguration()
+
+    init(
+        networkShares: [String] = [],
+        cloneVolumes: [String] = [],
+        backupProcessTerms: [String] = [],
+        startupDelaySeconds: Int = 20,
+        runAtLogin: Bool = false,
+        recheckIntervalMinutes: Int = 5
+    ) {
+        self.networkShares = networkShares
+        self.cloneVolumes = cloneVolumes
+        self.backupProcessTerms = backupProcessTerms
+        self.startupDelaySeconds = startupDelaySeconds
+        self.runAtLogin = runAtLogin
+        self.recheckIntervalMinutes = recheckIntervalMinutes
+    }
+
+    /// Tolerates keys missing from settings saved by older versions, so adding
+    /// a field never resets the user's configuration.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = AppConfiguration()
+        networkShares = try c.decodeIfPresent([String].self, forKey: .networkShares) ?? fallback.networkShares
+        cloneVolumes = try c.decodeIfPresent([String].self, forKey: .cloneVolumes) ?? fallback.cloneVolumes
+        backupProcessTerms = try c.decodeIfPresent([String].self, forKey: .backupProcessTerms) ?? fallback.backupProcessTerms
+        startupDelaySeconds = try c.decodeIfPresent(Int.self, forKey: .startupDelaySeconds) ?? fallback.startupDelaySeconds
+        runAtLogin = try c.decodeIfPresent(Bool.self, forKey: .runAtLogin) ?? fallback.runAtLogin
+        recheckIntervalMinutes = try c.decodeIfPresent(Int.self, forKey: .recheckIntervalMinutes) ?? fallback.recheckIntervalMinutes
+    }
+
+    /// Reduces a share address or a mount source such as
+    /// `//user@DS420/Mac%20Studio%20Time%20Machine` to a comparable
+    /// "host/path" key: no scheme, no user, case-insensitive, percent-decoded.
+    static func shareKey(for value: String) -> String? {
+        var text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let range = text.range(of: "://") {
+            text = String(text[range.upperBound...])
+        } else if text.hasPrefix("//") {
+            text = String(text.dropFirst(2))
+        } else if let colon = text.range(of: ":/") {
+            // NFS mount source: host:/export
+            text = text.replacingCharacters(in: colon, with: "/")
+        }
+        guard let slash = text.firstIndex(of: "/") else { return nil }
+        var host = String(text[..<slash])
+        if let at = host.lastIndex(of: "@") {
+            host = String(host[host.index(after: at)...])
+        }
+        if let colon = host.firstIndex(of: ":") {
+            host = String(host[..<colon])
+        }
+        var path = String(text[text.index(after: slash)...])
+        path = path.removingPercentEncoding ?? path
+        while path.hasSuffix("/") { path.removeLast() }
+        guard !host.isEmpty, !path.isEmpty else { return nil }
+        return "\(host)/\(path)".lowercased()
+    }
 
     static func normalizedLines(_ text: String) -> [String] {
         var seen = Set<String>()
